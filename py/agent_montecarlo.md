@@ -3,7 +3,7 @@
 ## Instructions
 
 1. To play a single game: `uv run agent_montecarlo.py`
-2. To play a single game with detailed output: `uv run agent_montecarlo.py --verbose`
+2. To play a single game with detailed output: `uv run agent_montecarlo.py --verbose --print-interval 100`
 3. To play 100 games and calculate win rate: `uv run agent_montecarlo.py --games 100`
 4. To modify the maximum steps: `uv run agent_montecarlo.py --max-steps 2000`
 5. Combined options: `uv run agent_montecarlo.py --games 100 --max-steps 1500`
