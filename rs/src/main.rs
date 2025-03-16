@@ -1,3 +1,4 @@
+use clap::Parser;
 use rand::Rng;
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -10,6 +11,31 @@ mod klondike;
 mod stack;
 
 use klondike::{Action, Game};
+
+/// Klondike Solitaire CLI application
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Number of games to play
+    #[arg(short, long, default_value_t = 1)]
+    games: u32,
+
+    /// Maximum steps per game before giving up
+    #[arg(short, long, default_value_t = 1000)]
+    max_steps: u32,
+
+    /// Enable verbose output
+    #[arg(short, long)]
+    verbose: bool,
+
+    /// Print game state every N steps (0 = never)
+    #[arg(long, default_value_t = 0)]
+    print_interval: u32,
+
+    /// Number of threads to use (0 = auto)
+    #[arg(short, long, default_value_t = 0)]
+    threads: usize,
+}
 
 /// Sample an action using weighted probabilities
 fn sample_action(valid_actions: &Vec<Action>, params: &[u32]) -> Action {
@@ -208,14 +234,23 @@ fn play_game(max_steps: u32, verbose: bool, print_interval: u32) -> (bool, u32) 
 }
 
 /// Play multiple games and report statistics
-fn play_multiple_games(num_games: u32, max_steps: u32, print_interval: u32) {
+fn play_multiple_games(num_games: u32, max_steps: u32, print_interval: u32, thread_count: usize) {
     let wins = Arc::new(Mutex::new(0));
     let total_steps = Arc::new(Mutex::new(0));
     let step_counts = Arc::new(Mutex::new(Vec::new()));
     let games_completed = Arc::new(Mutex::new(0));
 
     let start_time = Instant::now();
-    let num_threads = 4; // thread::available_parallelism().map(|p| p.get()).unwrap_or(4);
+    
+    // Determine optimal number of threads if auto mode
+    let num_threads = if thread_count == 0 {
+        thread::available_parallelism().map(|p| p.get()).unwrap_or(4)
+    } else {
+        thread_count
+    };
+    
+    // Ensure we don't use more threads than games
+    let num_threads = std::cmp::min(num_threads, num_games as usize);
     let games_per_thread = (num_games as usize + num_threads - 1) / num_threads;
 
     println!("Running games using {} threads", num_threads);
@@ -291,17 +326,27 @@ fn play_multiple_games(num_games: u32, max_steps: u32, print_interval: u32) {
         duration.as_secs_f64(),
         duration.as_secs_f64() / num_games as f64
     );
+    
+    // Calculate approximate speedup based on sequential vs parallel time
+    let sequential_estimate = duration.as_secs_f64() * num_threads as f64 / num_games as f64;
+    let speedup = sequential_estimate / (duration.as_secs_f64() / num_games as f64);
+    println!("Approximate speedup: {:.2}x (using {} threads)", speedup, num_threads);
 }
 
 fn main() {
-    // Play a single game of Klondike solitaire using the greedy heuristic agent
-    // let (win, steps) = play_game(1000, true, 100);
-    // println!(
-    //     "Game {} after {} steps",
-    //     if win { "won" } else { "lost" },
-    //     steps
-    // );
+    // Parse command line arguments
+    let args = Args::parse();
 
-    // Uncomment to play multiple games and gather statistics
-    play_multiple_games(100, 1000, 0);
+    if args.games == 1 {
+        // Play a single game
+        let (win, steps) = play_game(args.max_steps, args.verbose, args.print_interval);
+        println!(
+            "Game {} after {} steps",
+            if win { "won" } else { "lost" },
+            steps
+        );
+    } else {
+        // Play multiple games and gather statistics
+        play_multiple_games(args.games, args.max_steps, args.print_interval, args.threads);
+    }
 }
