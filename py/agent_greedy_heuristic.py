@@ -44,7 +44,7 @@ def sample_action(valid_actions: list[Action], params: list[int] = [5, 40, 20, 1
 
 def play_game(max_steps: int = 1000, verbose: bool = False, print_interval: int = 0) -> Tuple[bool, int]:
     """
-    Play a single game of Klondike solitaire using the tuned monte carlo agent.
+    Play a single game of Klondike solitaire using the greedy heuristic agent.
 
     Args:
         max_steps: Maximum number of steps before giving up
@@ -153,7 +153,7 @@ def play_multiple_games(num_games: int = 100, max_steps: int = 1000, print_inter
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='Play Klondike Solitaire with a tuned monte carlo agent')
+    parser = argparse.ArgumentParser(description='Play Klondike Solitaire with a greedy heuristic agent')
     parser.add_argument('--games', type=int, default=1,
                         help='Number of games to play (default: 1)')
     parser.add_argument('--max-steps', type=int, default=1000,
