@@ -531,7 +531,7 @@ impl Game {
             if let Some(card) = waste_card_opt {
                 for (i, _foundation) in Location::all_solves().iter().enumerate() {
                     let solve_size = self.solves[i].size();
-                    
+
                     if solve_size == 0 && card.number.number() == 1 {
                         // Ace to empty foundation
                         actions.push(Action::MoveWasteToFoundation(i as u8));
@@ -539,7 +539,7 @@ impl Game {
                         // Check if card can be placed on foundation
                         let mut solves_clone = self.solves.clone();
                         let mut foundation_clone = &mut solves_clone[i];
-                        
+
                         if let Some(top_card) = foundation_clone.inspect_top() {
                             if card.suit == top_card.suit
                                 && card.number.number() == top_card.number.number() + 1
@@ -562,7 +562,7 @@ impl Game {
                     // Check if card can be placed on tableau
                     let mut piles_clone = self.piles.clone();
                     let mut pile_clone = &mut piles_clone[i];
-                    
+
                     if Self::is_card_placable_on_pile(&card, pile_clone) {
                         actions.push(Action::MoveWasteToTableau(i as u8));
                     }
@@ -573,17 +573,17 @@ impl Game {
         // Tableau to foundation
         {
             let mut piles_clone = self.piles.clone();
-            
+
             for src_i in 0..piles_clone.len() {
                 let mut src_pile_clone = &mut piles_clone[src_i];
-                
+
                 if let Some(card) = src_pile_clone.inspect_top().cloned() {
                     let mut solves_clone = self.solves.clone();
-                    
+
                     for dst_i in 0..solves_clone.len() {
                         // Check if card can be placed on foundation
                         let mut foundation_clone = &mut solves_clone[dst_i];
-                        
+
                         if Self::is_card_placable_on_solve(&card, foundation_clone) {
                             actions.push(Action::MoveTableauToFoundation(src_i as u8, dst_i as u8));
                         }
@@ -595,17 +595,17 @@ impl Game {
         // Foundation to tableau
         {
             let mut solves_clone = self.solves.clone();
-            
+
             for src_i in 0..solves_clone.len() {
                 let mut src_foundation = &mut solves_clone[src_i];
-                
+
                 if let Some(card) = src_foundation.inspect_top().cloned() {
                     let mut piles_clone = self.piles.clone();
-                    
+
                     for dst_i in 0..piles_clone.len() {
                         // Check if card can be placed on tableau
                         let mut pile_clone = &mut piles_clone[dst_i];
-                        
+
                         if Self::is_card_placable_on_pile(&card, pile_clone) {
                             actions.push(Action::MoveFoundationToTableau(src_i as u8, dst_i as u8));
                         }
@@ -617,40 +617,40 @@ impl Game {
         // Tableau to tableau
         {
             let mut piles_clone = self.piles.clone();
-            
+
             for src_i in 0..piles_clone.len() {
                 let mut src_pile = &mut piles_clone[src_i];
-                
+
                 if src_pile.size_visible() == 0 {
                     continue; // Skip empty piles
                 }
-                
+
                 let visible_cards = src_pile.inspect(false);
-                
+
                 for src_card_idx in 0..visible_cards.len() {
                     if let Some(card) = visible_cards.get(src_card_idx).cloned() {
                         let mut piles_clone_inner = self.piles.clone();
-                        
+
                         for dst_i in 0..piles_clone_inner.len() {
                             if src_i == dst_i {
                                 continue; // Skip same pile
                             }
-                            
+
                             // Check if card stack can be placed on destination
                             let mut dst_pile = &mut piles_clone_inner[dst_i];
-                            
+
                             if Self::is_card_placable_on_pile(&card, dst_pile) {
                                 // Check if stack is valid (alternating colors, descending values)
                                 let mut is_valid_stack = true;
                                 for k in 1..src_card_idx {
                                     let top_card = visible_cards.get(k - 1);
                                     let bot_card = visible_cards.get(k);
-                                    
+
                                     if top_card.is_none() || bot_card.is_none() {
                                         is_valid_stack = false;
                                         break;
                                     }
-                                    
+
                                     if top_card.unwrap().number.number()
                                         >= bot_card.unwrap().number.number()
                                         || top_card.unwrap().suit.color()
@@ -660,7 +660,7 @@ impl Game {
                                         break;
                                     }
                                 }
-                                
+
                                 if is_valid_stack {
                                     actions.push(Action::MoveTableauToTableau(
                                         src_i as u8,

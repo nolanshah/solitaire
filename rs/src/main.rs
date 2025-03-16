@@ -202,12 +202,12 @@ fn play_game(max_steps: u32, verbose: bool, print_interval: u32) -> (bool, u32) 
         // Simple loop detection
         let waste_size = game.waste().size();
         let stock_size = game.stock().size();
-        
+
         let solves_sizes = {
             let solves = game.solves().clone();
             solves.iter().map(|s| s.size()).collect::<Vec<_>>()
         };
-        
+
         let piles_sizes = {
             let piles = game.piles().clone();
             let mut result = Vec::new();
@@ -217,16 +217,8 @@ fn play_game(max_steps: u32, verbose: bool, print_interval: u32) -> (bool, u32) 
             }
             result
         };
-        
-        let state_key = format!(
-            "{:?}",
-            (
-                waste_size,
-                stock_size,
-                solves_sizes,
-                piles_sizes
-            )
-        );
+
+        let state_key = format!("{:?}", (waste_size, stock_size, solves_sizes, piles_sizes));
 
         if let Some(count) = seen_states.get(&state_key) {
             if *count > 3 {
