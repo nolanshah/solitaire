@@ -1,6 +1,8 @@
 use rand::Rng;
 use std::collections::HashMap;
 use std::io::{self, Write};
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::Instant;
 
 mod card;
@@ -207,23 +209,75 @@ fn play_game(max_steps: u32, verbose: bool, print_interval: u32) -> (bool, u32) 
 
 /// Play multiple games and report statistics
 fn play_multiple_games(num_games: u32, max_steps: u32, print_interval: u32) {
-    let mut wins = 0;
-    let mut total_steps = 0;
-    let mut step_counts = Vec::new();
+    let wins = Arc::new(Mutex::new(0));
+    let total_steps = Arc::new(Mutex::new(0));
+    let step_counts = Arc::new(Mutex::new(Vec::new()));
+    let games_completed = Arc::new(Mutex::new(0));
 
     let start_time = Instant::now();
+    let num_threads = 4; // thread::available_parallelism().map(|p| p.get()).unwrap_or(4);
+    let games_per_thread = (num_games as usize + num_threads - 1) / num_threads;
 
-    for i in 0..num_games {
-        print!("Playing game {}/{} ...\r", i + 1, num_games);
-        io::stdout().flush().unwrap();
+    println!("Running games using {} threads", num_threads);
 
-        let (win, steps) = play_game(max_steps, false, print_interval);
-        if win {
-            wins += 1;
+    let mut handles = vec![];
+
+    for thread_id in 0..num_threads {
+        let start_game = thread_id * games_per_thread;
+        let end_game = std::cmp::min((thread_id + 1) * games_per_thread, num_games as usize);
+
+        if start_game >= end_game {
+            continue;
         }
-        total_steps += steps;
-        step_counts.push(steps);
+
+        let thread_games = (end_game - start_game) as u32;
+        let thread_wins = Arc::clone(&wins);
+        let thread_total_steps = Arc::clone(&total_steps);
+        let thread_step_counts = Arc::clone(&step_counts);
+        let thread_games_completed = Arc::clone(&games_completed);
+
+        let handle = thread::spawn(move || {
+            for _ in 0..thread_games {
+                let (win, steps) = play_game(max_steps, false, print_interval);
+
+                // Update shared statistics
+                let mut completed = thread_games_completed.lock().unwrap();
+                *completed += 1;
+
+                if win {
+                    let mut win_count = thread_wins.lock().unwrap();
+                    *win_count += 1;
+                }
+
+                {
+                    let mut steps_total = thread_total_steps.lock().unwrap();
+                    *steps_total += steps;
+                }
+
+                {
+                    let mut steps_vec = thread_step_counts.lock().unwrap();
+                    steps_vec.push(steps);
+                }
+
+                // Print progress every few games
+                if *completed % 10 == 0 || *completed == num_games {
+                    print!("Completed {}/{} games...\r", *completed, num_games);
+                    io::stdout().flush().unwrap();
+                }
+            }
+        });
+
+        handles.push(handle);
     }
+
+    // Wait for all threads to complete
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    // Get final statistics
+    let wins = *wins.lock().unwrap();
+    let total_steps = *total_steps.lock().unwrap();
 
     let duration = start_time.elapsed();
     let win_rate = (wins as f64 / num_games as f64) * 100.0;
