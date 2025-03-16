@@ -1,5 +1,6 @@
 use rand::Rng;
 use std::collections::HashMap;
+use std::io::{self, Write};
 use std::time::Instant;
 
 mod card;
@@ -98,10 +99,7 @@ fn play_game(max_steps: u32, verbose: bool, print_interval: u32) -> (bool, u32) 
     let mut steps = 0;
 
     // Default action weights
-    let params = [5, 40, 20, 10, 20, 1, 5]; // Same weights as Python
-
-    // Simple loop detection using HashMap
-    let mut seen_states = HashMap::new();
+    let params = [5, 40, 20, 10, 20, 1, 5];
 
     while steps < max_steps {
         // Check if game is won
@@ -198,40 +196,6 @@ fn play_game(max_steps: u32, verbose: bool, print_interval: u32) -> (bool, u32) 
                 steps, foundation_cards
             );
         }
-
-        // Simple loop detection
-        let waste_size = game.waste().size();
-        let stock_size = game.stock().size();
-
-        let solves_sizes = {
-            let solves = game.solves().clone();
-            solves.iter().map(|s| s.size()).collect::<Vec<_>>()
-        };
-
-        let piles_sizes = {
-            let piles = game.piles().clone();
-            let mut result = Vec::new();
-            for i in 0..piles.len() {
-                let mut pile = piles[i].clone();
-                result.push((pile.size_visible(), pile.size_hidden()));
-            }
-            result
-        };
-
-        let state_key = format!("{:?}", (waste_size, stock_size, solves_sizes, piles_sizes));
-
-        if let Some(count) = seen_states.get(&state_key) {
-            if *count > 3 {
-                // Allow revisiting states a few times
-                if verbose {
-                    println!("Loop detected after {} steps. Game lost.", steps);
-                }
-                return (false, steps);
-            }
-            seen_states.insert(state_key, count + 1);
-        } else {
-            seen_states.insert(state_key, 1);
-        }
     }
 
     if verbose {
@@ -251,6 +215,7 @@ fn play_multiple_games(num_games: u32, max_steps: u32, print_interval: u32) {
 
     for i in 0..num_games {
         print!("Playing game {}/{} ...\r", i + 1, num_games);
+        io::stdout().flush().unwrap();
 
         let (win, steps) = play_game(max_steps, false, print_interval);
         if win {
@@ -276,13 +241,13 @@ fn play_multiple_games(num_games: u32, max_steps: u32, print_interval: u32) {
 
 fn main() {
     // Play a single game of Klondike solitaire using the greedy heuristic agent
-    let (win, steps) = play_game(1000, true, 100);
-    println!(
-        "Game {} after {} steps",
-        if win { "won" } else { "lost" },
-        steps
-    );
+    // let (win, steps) = play_game(1000, true, 100);
+    // println!(
+    //     "Game {} after {} steps",
+    //     if win { "won" } else { "lost" },
+    //     steps
+    // );
 
     // Uncomment to play multiple games and gather statistics
-    // play_multiple_games(100, 1000, 0);
+    play_multiple_games(100, 1000, 0);
 }
