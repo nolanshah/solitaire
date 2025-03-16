@@ -11,7 +11,20 @@ From the `py` directory:
 - Linting: `uv run ruff check .`
 - Format code: `uv run ruff format .`
 
+### Rust
+
+From the `rs` directory:
+- Run tests: `cargo test`
+- Run single test: `cargo test test_name`
+- Run main: `cargo run`
+- Type check: `cargo check`
+- Linting: `cargo clippy`
+- Format code: `cargo fmt`
+
 ## Code Style Guidelines
+
+### Python
+
 - Python 3.12+ compatible code
 - Line length: 120 characters max
 - Use type hints for all functions and variables
