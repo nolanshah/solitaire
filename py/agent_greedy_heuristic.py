@@ -2,7 +2,10 @@ from klondike import Action, Location, Klondike
 import random
 import argparse
 import time
-from typing import List, Tuple, Dict
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
+import os
+from typing import List, Tuple, Dict, Optional
 
 
 def sample_action(valid_actions: list[Action], params: list[int] = [5, 40, 20, 10, 20, 1, 5]) -> Action:
@@ -117,42 +120,94 @@ def play_game(max_steps: int = 1000, verbose: bool = False, print_interval: int 
     return False, steps
 
 
-def play_multiple_games(num_games: int = 100, max_steps: int = 1000, print_interval: int = 0) -> None:
+def play_game_worker(args: Tuple[int, int, int]) -> Tuple[bool, int]:
     """
-    Play multiple games and report statistics.
+    Worker function for parallel execution of games.
+    
+    Args:
+        args: Tuple containing (game_id, max_steps, print_interval)
+        
+    Returns:
+        Tuple of (win status, number of steps taken)
+    """
+    game_id, max_steps, print_interval = args
+    return play_game(max_steps=max_steps, verbose=False, print_interval=print_interval)
+
+
+def play_multiple_games(num_games: int = 100, max_steps: int = 1000, print_interval: int = 0, 
+                     num_processes: Optional[int] = None) -> None:
+    """
+    Play multiple games in parallel and report statistics.
 
     Args:
         num_games: Number of games to play
         max_steps: Maximum steps per game
         print_interval: Number of turns after which to print game state (0 = never print)
+        num_processes: Number of processes to use (None = auto)
     """
-    wins = 0
-    total_steps = 0
-    step_counts: List[int] = []
-
+    # Determine optimal number of processes
+    if num_processes is None or num_processes <= 0:
+        num_cpus = os.cpu_count() or 4
+        num_processes = min(num_cpus, num_games)
+    else:
+        num_processes = min(num_processes, num_games)
+    
+    print(f"Playing {num_games} games using {num_processes} processes...")
+    
     start_time = time.time()
-
-    for i in range(num_games):
-        print(f"Playing game {i+1}/{num_games}...", end="\r")
-        win, steps = play_game(max_steps=max_steps, print_interval=print_interval)
-        if win:
-            wins += 1
-        total_steps += steps
-        step_counts.append(steps)
-
+    
+    # Create arguments for each game
+    game_args = [(i, max_steps, print_interval) for i in range(num_games)]
+    
+    # Initialize result containers
+    results: List[Tuple[bool, int]] = []
+    
+    # Progress tracking
+    completed = 0
+    
+    # Use ProcessPoolExecutor to manage processes
+    with ProcessPoolExecutor(max_workers=num_processes) as executor:
+        # Submit all jobs and process results as they complete
+        for result in executor.map(play_game_worker, game_args):
+            results.append(result)
+            
+            # Update progress
+            completed += 1
+            if completed % max(1, num_games // 20) == 0 or completed == num_games:
+                print(f"Completed {completed}/{num_games} games...", end="\r")
+    
+    # Extract results
+    wins = sum(1 for win, _ in results if win)
+    total_steps = sum(steps for _, steps in results)
+    step_counts = [steps for _, steps in results]
+    
     end_time = time.time()
     duration = end_time - start_time
-
+    
     win_rate = (wins / num_games) * 100
     avg_steps = total_steps / num_games
-
+    
     print(f"\nResults from {num_games} games:")
     print(f"Win rate: {win_rate:.2f}% ({wins}/{num_games})")
     print(f"Average steps per game: {avg_steps:.2f}")
     print(f"Time taken: {duration:.2f} seconds ({duration/num_games:.2f} seconds per game)")
+    
+    # Calculate approximate speedup based on sequential vs parallel time
+    sequential_estimate = duration * num_processes / num_games
+    speedup = sequential_estimate / (duration / num_games)
+    print(f"Approximate speedup: {speedup:.2f}x (using {num_processes} cores)")
 
 
 def main() -> None:
+    """Main entry point for the CLI application."""
+    # Handle process start method for multiprocessing on macOS
+    if hasattr(mp, 'set_start_method'):
+        try:
+            mp.set_start_method('spawn')
+        except RuntimeError:
+            # Method already set
+            pass
+    
     parser = argparse.ArgumentParser(description='Play Klondike Solitaire with a greedy heuristic agent')
     parser.add_argument('--games', type=int, default=1,
                         help='Number of games to play (default: 1)')
@@ -162,14 +217,23 @@ def main() -> None:
                         help='Print detailed game progress')
     parser.add_argument('--print-interval', type=int, default=0,
                         help='Print game state every N steps (default: 0 = never)')
+    parser.add_argument('--processes', type=int, default=0,
+                        help='Number of processes to use (default: 0 = auto)')
 
     args = parser.parse_args()
 
     if args.games == 1:
+        # For a single game, just run directly (no parallelization needed)
         win, steps = play_game(max_steps=args.max_steps, verbose=args.verbose, print_interval=args.print_interval)
         print(f"Game {'won' if win else 'lost'} after {steps} steps")
     else:
-        play_multiple_games(num_games=args.games, max_steps=args.max_steps, print_interval=args.print_interval)
+        # For multiple games, use parallel implementation
+        play_multiple_games(
+            num_games=args.games, 
+            max_steps=args.max_steps, 
+            print_interval=args.print_interval,
+            num_processes=args.processes
+        )
 
 
 if __name__ == "__main__":
